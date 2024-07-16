@@ -1,0 +1,643 @@
+openapi: "3.0.3"
+info:
+  title: ITSM Integration API
+  description: |-
+    Dexmach ITSM integration API's
+  license:
+    name: Dexmach
+    url: https://www.dexmach.com
+
+  version: "1.0"
+  contact:
+    email: "support@dexmach.com"
+servers:
+  - url: "https://dm-itsm-apim-prd-01.azure-api.net/itsm/dev/v1"
+    description: Development Api endpoint
+  - url: "https://dm-itsm-apim-prd-01.azure-api.net/itsm/prd/v1"
+    description: Production Api endpoint
+
+paths:
+  /incident:
+    post:
+      operationId: createIncident
+      summary: Create Incident
+      description: |-
+        Create new incident.
+
+        ```
+        Required fields:
+
+        * account_id
+        * title
+        * description (base64 encoded string Optional)
+        ```
+        ```
+        Optional fields:
+
+        * urgency:
+            type: string
+            description: Urgency of the incident (Low, Medium, High, Critical)
+            default: Low
+            enum:
+              - Low
+              - Medium
+              - High
+              - Critical
+        * impact:
+            type: string
+            description: "Impact of the incident (Low, Medium, High, Critical)"
+            default: Low
+            enum:
+              - Low
+              - Medium
+              - High
+              - Critical
+        * customer_reference_id:
+            type: string
+            description: "Unique Incident identifier e.g: USD incident number"    
+        ```
+      requestBody:
+        description: Create New incident
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Incident"
+            examples:
+              Incident:
+                value:
+                  account_id: 4d112154-9b86-4fa8-973d-fdb7b82d5f72
+                  title: Virtual machine testvm unavailable
+                  description: After updating the virtual machine testvm the system became unavailable.
+                  urgency: "High"
+                  impact: "Medium"
+                  customer_reference_id: "USD183413413"
+
+        required: true
+      tags:
+        - "Incident"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+        "550":
+          description: Creation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: Failed
+                message: Creation failed failed
+        "404":
+          description: Validation exception
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: Failed
+                message: Validation failed
+    put:
+      operationId: updateIncident
+      summary: Update incident
+      description: |-
+        Update Incident.
+        ```
+        This function can be used for: 
+          * Update urgency
+          * Update impact
+          * Update status
+          ```
+          ```
+          * urgency:
+              type: string
+              description: Urgency of the incident (Low, Medium, High, Critical)
+              enum:
+              - Low
+              - Medium
+              - High
+              - Critical
+          * impact:
+              type: string
+              description: "Impact of the incident (Low, Medium, High, Critical)
+              enum:
+                - Low
+                - Medium
+                - High
+                - Critical
+          *  status:
+              type: string
+              description: "Status of the incident"
+              enum:
+                - "AwaitingAssignment"
+                - "InProgress"
+                - "OnHold"
+                - "Resolved"
+                - "Closed"
+              Warning: After setting an incident to Closed status no further updates are possible !
+          ```
+      tags:
+        - Incident
+      requestBody:
+        description: Update Incident
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/updateIncident"
+            examples:
+              "Update priority":
+                value:
+                  correlation_id: "8e7abcff-5740-ef11-8409-000d3abc05e1"
+                  urgency: Medium
+                  impact: "High"
+              "Update Status":
+                value:
+                  correlation_id: "8e7abcff-5740-ef11-8409-000d3abc05e1"
+                  status: "OnHold"
+        required: true
+      responses:
+        "200":
+          description: Ticket Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+        "404":
+          description: Validation exception
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: failed
+                message: correlation_id not found
+        "550":
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: failed
+                message: "Failed to update ticket with correlation_id: Please notify DexMach support@dexmach.com."
+
+  /incident/{customer_reference_id}:
+    get:
+      operationId: getIncidentByCustomerReferenceId
+      summary: Get incident by customer_reference_id.
+      description: |-
+        ```
+        ```
+      tags:
+        - "Incident"
+      parameters:
+        - name: customer_reference_id
+          in: path
+          description: customer_reference_id
+          required: true
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 50
+      responses:
+          "200":
+            description: Return incident
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Incident"
+          "404":
+            description: Incident not found
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/IncidentResponse"    
+  /comment:
+    post:
+      operationId: addComment
+      summary: Add comment to ticket or service request
+      description: |-
+        Add Comment to incident
+
+        ```
+        Required:
+        * correlation_id
+        * comment
+        ```
+      tags:
+        - Incident
+        - Service Request
+      requestBody:
+        description: Add comment to ticket
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/addComment"
+            example:
+              correlation_id: 7ef3b588-b5a7-45d3-b5aa-0669f996f5cb
+              comment: comment
+        required: true
+      responses:
+        "200":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: failed
+                message: correlation_id invalid
+        "550":
+          description: Add comment failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: failed
+                message: "Failed to add comment to incident with correlation_id: 7ef3b588-b5a7-45d3-b5aa-0669f996f5cb. Error () Please notify support@dexmach.com"
+  /attachment:
+    post:
+      operationId: addAttachment
+      summary: Add attachment to ticket or service request
+      description: |-
+        Add attachment to ticket or service request
+
+        ```
+        Required:
+        * correlation_id
+        * mime_type
+        * file_name
+        * content
+        ```
+      tags:
+        - Incident
+        - Service Request
+      requestBody:
+        description: Add attachment to ticket or service request
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/addAttachment"
+            example:
+              correlation_id: 7ef3b588-b5a7-45d3-b5aa-0669f996f5cb
+              mime_type: type/image
+              file_name: test.png
+              content: "dGVzdCBpbWFnZQo="
+        required: true
+      responses:
+        "200":
+          description: Attachment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+        "404":
+          description: invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: failed
+                message: correlation_id invalid
+        "550":
+          description: Add attachment failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: Failed
+                message: "Failed to add attachment to incident with correlation_id: 7ef3b588-b5a7-45d3-b5aa-0669f996f5cb. Error () Please notify support@dexmach.com"
+  /servicerequest:
+    post:
+      operationId: createServiceRequest
+      summary: Create Service Request
+      description: |-
+        Create new Service Request.
+
+        ```
+        Required fields:
+
+        * account_id
+        * title
+        * description (base64 encoded string Optional)
+        ```
+        ```
+        Optional fields:
+
+        * customer_reference_id:
+            type: string
+            description: "Unique Incident identifier e.g: USD incident number"     
+        ```
+      requestBody:
+        description: Create New Service Request
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceRequest"
+            examples:
+              Incident:
+                value:
+                  account_id: 4d112154-9b86-4fa8-973d-fdb7b82d5f72
+                  title: Create new Application gateway
+                  description: See attachment for config.
+                  customer_reference_id: "USD183413417"
+
+        required: true
+      tags:
+        - "Service Request"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+        "550":
+          description: Creation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: Failed
+                message: Creation failed 
+        "404":
+          description: Validation exception
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: Failed
+                message: Validation failed
+    put:
+      operationId: updateServiceRequest
+      summary: Update service request
+      description: |-
+        Update Service Request.
+        ```
+        This function can be used for: 
+          * Update status
+          ```
+          ```
+          *  status:
+              type: string
+              description: "Status of the Service Request"
+              enum:
+                - "AwaitingAssignment"
+                - "InProgress"
+                - "OnHold"
+                - "Resolved"
+                - "Closed"
+              Warning: After setting a service request to Closed status no further updates are possible !
+          ```
+      tags:
+        - "Service Request"
+      requestBody:
+        description: Update Service Request
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/updateIncident"
+            examples:
+              "Update Status":
+                value:
+                  correlation_id: "8e7abcff-5740-ef11-8409-000d3abc05e1"
+                  account_id: "4d112154-9b86-4fa8-973d-fdb7b82d5f72"
+                  status: "OnHold"
+        required: true
+      responses:
+        "200":
+          description: Ticket Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+        "404":
+          description: Validation exception
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: failed
+                message: correlation_id not found
+        "550":
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentResponse"
+              example:
+                status: failed
+                message: "Failed to update ticket with correlation_id: Please notify DexMach support@dexmach.com."                
+security:
+  - apiKeyQuery: []
+  - apiKeyHeader: []
+
+tags:
+  - name: Incident
+    description: Incident operations
+
+components:
+  schemas:
+    addComment:
+      type: object
+      properties:
+        correlation_id:
+          type: string
+          format: uuid
+          description: Unique incident uuid 
+        comment:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Comment text
+      required:
+        - correlation_id
+        - comment
+    addAttachment:
+      type: object
+      properties:
+        correlation_id:
+          type: string
+          format: uuid
+          description: Unique incident uuid 
+        mime_type:
+          type: string
+          description: Attachment type (Image,Archive,Document)
+        file_name:
+          type: string
+          minLength: 4
+          maxLength: 30
+        content:
+          type: string
+          format: byte
+          description: base64 encoded attachment
+      required:
+        - correlation_id
+        - mime_type
+        - file_name
+        - content
+    IncidentResponse:
+      type: object
+      properties:
+        correlation_id:
+          type: string
+        status:
+          type: string
+          description: Response status
+          enum:
+            - "OK"
+            - "Created"
+            - "Failed"
+        message:
+          type: string
+          description: Response message
+    Incident:
+      type: object
+      properties:
+        account_id:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: Unique customer indentification id
+        title:
+          type: string
+          minLength: 0
+          description: Incident Title
+        description:
+          type: string
+          maxLength: 100000
+          description: Incident Description
+        urgency:
+          type: string
+          description: Urgency of the incident (Low, Medium, High, Critical)
+          default: Low
+          enum:
+            - Low
+            - Medium
+            - High
+            - Critical
+        impact:
+          type: string
+          description: "Impact of the incident (Low, Medium, High, Critical)"
+          default: Low
+          enum:
+            - Low
+            - Medium
+            - High
+            - Critical
+        customer_reference_id:
+          type: string
+          description: "Unique Incident identifier e.g: USD incident number"
+      required:
+        - "account_id"
+        - "title"
+        - "description"
+    updateIncident:
+      type: object
+      properties:
+        correlation_id:
+          type: string
+          format: uuid
+          description: Unique incident identifier
+          minLength: 36
+          maxLength: 36
+        urgency:
+          type: string
+          description: Urgency of the incident (Low, Medium, High, Critical)
+          default: Low
+          enum:
+            - Low
+            - Medium
+            - High
+            - Critical
+        impact:
+          type: string
+          description: "Impact of the incident (Low, Medium, High, Critical)"
+          default: Low
+          enum:
+            - Low
+            - Medium
+            - High
+            - Critical
+        status:
+          type: string
+          description: "Status of the incident"
+          enum:
+            - "AwaitingAssignment"
+            - "InProgress"
+            - "OnHold"
+            - "Resolved"
+            - "Closed"
+      required:
+        - "correlation_id"
+        - "account_id"
+    ServiceRequest:
+      type: object
+      properties:
+        account_id:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: Unique customer indentification id
+        title:
+          type: string
+          minLength: 0
+          description: Incident Title
+        description:
+          type: string
+          maxLength: 100000
+          description: Incident Description
+        customer_reference_id:
+          type: string
+          description: "Unique Incident identifier e.g: USD incident number"
+      required:
+        - "account_id"
+        - "title"
+        - "description"
+    updateServiceRequest:
+      type: object
+      properties:
+        correlation_id:
+          type: string
+          format: uuid
+          description: Unique incident identifier
+          minLength: 36
+          maxLength: 36
+        status:
+          type: string
+          description: "Status of the service request"
+          enum:
+            - "AwaitingAssignment"
+            - "InProgress"
+            - "OnHold"
+            - "Fullfilled"
+            - "Closed"
+      required:
+        - "correlation_id"
+        - "account_id"   
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
